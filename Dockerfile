@@ -1,34 +1,31 @@
-# 1. Imagen base oficial de PHP con Apache
 FROM php:8.2-apache
 
-# 2. Instalación de dependencias del sistema y extensiones de PHP
-# (Incluye pdo_mysql y zip como tenías originalmente)
+# 1. Dependencias y extensiones
 RUN apt-get update && apt-get install -y \
-    git \
-    unzip \
-    libzip-dev \
+    git unzip libzip-dev \
     && docker-php-ext-install pdo pdo_mysql zip \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 3. Habilitar mod_rewrite (vital para frameworks y rutas amigables)
+# 2. Habilitar mod_rewrite
 RUN a2enmod rewrite
 
-# 4. Redirigir logs de Apache a la consola de Railway
-# Esto hará que los errores aparezcan en la pestaña "Deploy Logs"
+# 3. FIX: Logs a la consola para ver errores en Railway
 RUN ln -sf /dev/stdout /var/log/apache2/access.log \
     && ln -sf /dev/stderr /var/log/apache2/error.log
 
-# 5. Establecer el directorio de trabajo
+# 4. CONFIGURACIÓN DEL PUERTO (Sin romper los MPM)
+# Sobreescribimos el puerto en los archivos base antes de arrancar
+RUN echo "Listen \${PORT}" > /etc/apache2/ports.conf
+
+# Configuramos el VirtualHost para que apunte al puerto dinámico
+RUN sed -i 's/<VirtualHost \*:80>/<VirtualHost *:${PORT}>/' /etc/apache2/sites-available/000-default.conf
+
 WORKDIR /var/www/html
 
-# 6. Copiar los archivos de tu proyecto (incluyendo tu index.php)
+# 5. Copiar archivos y permisos
 COPY . .
-
-# 7. Ajustar permisos para que Apache pueda leer/escribir correctamente
 RUN chown -R www-data:www-data /var/www/html
 
-# 8. Comando de arranque
-# Este comando es el más importante:
-# - Sustituye el puerto 80 por el que Railway asigne ($PORT) en tiempo de ejecución.
-# - Luego arranca Apache en primer plano.
-CMD ["sh", "-c", "sed -i \"s/Listen 80/Listen ${PORT}/\" /etc/apache2/ports.conf && sed -i \"s/:80/:${PORT}/\" /etc/apache2/sites-available/000-default.conf && apache2-foreground"]
+# 6. El CMD corregido para evitar el error de MPM
+# Usamos apache2-foreground directamente, pero pasando el puerto
+CMD ["sh", "-c", "sed -i \"s/Listen 80/Listen ${PORT}/g\" /etc/apache2/ports.conf && sed -i \"s/:80/:${PORT}/g\" /etc/apache2/sites-available/000-default.conf && apache2-foreground"]
