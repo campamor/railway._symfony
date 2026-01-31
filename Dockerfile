@@ -1,21 +1,21 @@
 FROM php:8.2-apache
 
-# Habilitar mod_rewrite
 RUN a2enmod rewrite
 
-# Extensiones PHP típicas
-RUN docker-php-ext-install mysqli pdo pdo_mysql
+# Desactivar event y activar prefork (necesario para mod_php)
+RUN a2dismod mpm_event && a2enmod mpm_prefork
 
-# Copiar tu proyecto
+RUN apt-get update && apt-get install -y \
+    libzip-dev zip unzip && \
+    docker-php-ext-install mysqli pdo pdo_mysql zip
+
+# Ajustar Apache para Railway
+RUN sed -i "s/80/\${PORT}/g" /etc/apache2/ports.conf /etc/apache2/sites-enabled/000-default.conf
+
 COPY . /var/www/html/
-
-# Permisos recomendados
 RUN chown -R www-data:www-data /var/www/html
 
-# Exponer el puerto de Apache
 EXPOSE 80
-
-# Arrancar Apache
 CMD ["apache2-foreground"]
 
 
