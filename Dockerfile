@@ -1,18 +1,22 @@
 FROM php:8.2-apache
 
-# Apagar todos los MPM y encender solo prefork
-RUN a2dismod mpm_event || true \
-    && a2dismod mpm_worker || true \
-    && a2dismod mpm_prefork || true \
-    && a2enmod mpm_prefork
+# Habilitar mod_rewrite
+RUN a2enmod rewrite
 
-# Activar rewrite y extensiones
-RUN a2enmod rewrite \
-    && docker-php-ext-install pdo pdo_mysql mysqli
+# Extensiones PHP típicas
+RUN docker-php-ext-install mysqli pdo pdo_mysql
 
+# Copiar tu proyecto
 COPY . /var/www/html/
+
+# Permisos recomendados
 RUN chown -R www-data:www-data /var/www/html
 
+# Exponer el puerto de Apache
+EXPOSE 80
+
+# Arrancar Apache
 CMD ["apache2-foreground"]
+
 
 
