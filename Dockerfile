@@ -1,24 +1,48 @@
-# Imagen base PHP + Apache
-FROM php:8.2-apache
+FROM php:7.4-apache
 
-# Activar módulos necesarios
-RUN a2enmod rewrite
+#instalacion git y actualizacion sistema
+RUN apt update && apt install -y git 
 
-# Instalar extensiones PHP comunes
-RUN apt-get update && apt-get install -y libzip-dev zip unzip \
-    && docker-php-ext-install mysqli pdo pdo_mysql zip \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+WORKDIR /var/www/html
 
-# Copiar la aplicación al contenedor
-COPY . /var/www/html/
+#clonacion de repositorio con aplicacion de symfony
+RUN git clone https://github.com/picarenlamina/symfony_blob.git .
+
+#permisos de lectura en apache
 RUN chown -R www-data:www-data /var/www/html
 
-# Configurar Apache para usar el puerto que asigna Railway en runtime
-ENV PORT 8080
-RUN sed -i "s/80/${PORT}/g" /etc/apache2/ports.conf /etc/apache2/sites-enabled/000-default.conf
+#instalacion extensiones mysql
+RUN docker-php-ext-install mysqli
+RUN docker-php-ext-install pdo 
+RUN docker-php-ext-install pdo_mysql
 
-# Exponer puerto (solo referencia, Railway maneja el mapping)
-EXPOSE 8080
+#instalacion de curl y zip
+RUN apt-get update && apt-get install -y \
+    curl \
+    zip \
+    unzip
+# Docker playgroud requerimiento
+ENV COMPOSER_ALLOW_SUPERUSER=1
 
-# Arranque de Apache en primer plano
-CMD ["apache2-foreground"]
+#descarga e instalacion composer 
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/bin --filename=composer && chmod +x /usr/bin/composer
+
+#instalacion de extensiones mediante composer configuradas en composer.json
+RUN php /usr/bin/composer install 
+
+
+
+#RUN  composer require symfony/apache-pack
+
+# Actualizamos fichero de configuracion de apache para que gestione symfony
+COPY /apache/apache2.conf /etc/apache2
+
+# Copies your code to the image
+COPY /site /var/www/html
+
+# Declarar $PORT en railway con valor 80
+EXPOSE $PORT
+#CMD [“apache2ctl”, “-D”, “FOREGROUND”]
+
+# Arranque de apache
+ENTRYPOINT apache2ctl -D 'FOREGROUND'
